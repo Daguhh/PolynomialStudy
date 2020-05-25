@@ -159,6 +159,7 @@ class PolyMplCanvas(MyMplCanvas):
         timer = QtCore.QTimer(self)
         timer.timeout.connect(self.update_figures)
         timer.start(1000)
+        timer.setInterval(100)
 
 
     def show_plot(self, name, val):
@@ -173,7 +174,6 @@ class PolyMplCanvas(MyMplCanvas):
 
 
     def update_figures(self):
-        print('*********** updatessss ******************')
         #self.update_figure()
         for fig in self.fig_list:
             if fig.isShow:
@@ -182,6 +182,17 @@ class PolyMplCanvas(MyMplCanvas):
         self.axes.set_ylim(-50,50)
         self.axes.grid(True)
         self.draw()
+
+    def get_trace_buffer_size(self):
+        size = self.fig_list[0].max_buffer
+        return size
+
+    def change_trace_buffer_size_4_all(self, max_buffer):
+
+        for fig in self.fig_list:
+            fig.clear_figs()
+            print(f'new buffer = {max_buffer}')
+            fig.max_buffer = max_buffer
 
 class FigFig:
 
@@ -196,7 +207,8 @@ class FigFig:
         self.plot1 = list()
         self.mask = np.array(mask)
         self.setFct(1,1,1)
-        self.isShow = True
+        self.isShow = False
+        self.max_buffer = 30
         pass
 
     def setFct(self, *params):
@@ -218,7 +230,6 @@ class FigFig:
         self.axes.grid(True)
 
     def update_figure(self):
-        print('==== update =====')
 
         x = np.linspace(-20, 20, 100)
         y = self.fct(x)
@@ -231,7 +242,7 @@ class FigFig:
 #            c = (1/max_buffer)*(max_buffer-i)
 #            l.set_color((c,c,c))
 #
-        max_buffer = 10
+        max_buffer = self.max_buffer
         if len(self.plot1) > max_buffer:
             self.plot1.pop(0).remove()
         for i, l in enumerate(self.plot1):
@@ -353,6 +364,27 @@ class ApplicationWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.b_slider.sliderMoved.connect(self.change_parameter)
         self.c_slider.sliderMoved.connect(self.change_parameter)
 
+        self.actionFrameRate.triggered.connect(self.change_frame_rate)
+        self.actionTaille4Trace.triggered.connect(self.change_trace_size)
+
+    def change_frame_rate(self):
+        pass
+
+    def change_trace_size(self):
+        val = self.get_new_buffer_size_value()
+        self.polyplot.change_trace_buffer_size_4_all(val)
+
+    def get_new_buffer_size_value(self, *args):
+
+        buffer_size = self.polyplot.get_trace_buffer_size()
+        dialog = AskSpinBox(buffer_size)
+        #dialog.exec_()
+        if dialog.exec_():
+            new_buffer_size = dialog.get_values()
+        else:
+            new_buffer_size = dialog.cancel()
+        return new_buffer_size
+
     def add_function_to_list(self, fct_name):
 
         checkbox = QtWidgets.QCheckBox(fct_name)
@@ -371,7 +403,6 @@ class ApplicationWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
         if state == QtCore.Qt.Checked:
-            print(f'sender = {self.sender().text()}')
             self.polyplot.show_plot(self.sender().text(), True)
         else:
             self.polyplot.show_plot(self.sender().text(), False)
@@ -423,7 +454,6 @@ class ApplicationWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def change_parameter(self):
         sender_name = self.sender().objectName()
         val = self.sender().value()
-        print(f'sender : {sender_name[0]}')
         if sender_name[0] == 'a':
             self.a_label.setText(f'a = {val}')
             self.a_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -438,7 +468,6 @@ class ApplicationWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.c = int(val)
 
         self.polyplot.set_params(self.c, self.b, self.a)
-        print(f'a = {self.a}, b = {self.b}, c = {self.c}')
         self.polyplot.update_figures()
 
     def fileQuit(self):
@@ -450,6 +479,35 @@ class ApplicationWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def about(self):
         pass
 
+
+class AskSpinBox(QtWidgets.QDialog):
+
+    def __init__(self, val):
+        super(QtWidgets.QDialog, self).__init__()
+        self.layout = QtWidgets.QGridLayout(self) #QVBoxLayout(self)
+
+
+        self.spinbox = QtWidgets.QSpinBox()
+        self.spinbox.setRange(1,60)
+        self.spinbox.setValue(val)
+        self.layout.addWidget(self.spinbox, 1, 1, 1, 2)
+
+        ok_btn = QtWidgets.QPushButton("Ok")
+        ok_btn.clicked.connect(self.accept)
+
+        cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.close)
+
+        self.layout.addWidget(cancel_btn, 2, 1)
+        self.layout.addWidget(ok_btn, 2, 2)
+
+    def get_values(self):
+
+        val = int(self.spinbox.value())
+        return val
+
+    def cancel(self):
+        return 0
 
 qApp = QtWidgets.QApplication(sys.argv)
 
